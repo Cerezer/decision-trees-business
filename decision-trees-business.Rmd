@@ -1,0 +1,154 @@
+---
+title: "Data-Driven Decision Trees for Business"
+author: "Felipe O. Cerezer"
+date: "`r Sys.Date()`"
+output: pdf_document
+theme: paper
+---
+
+# Step 1: Required Libraries
+
+We will use the following R packages: - `rpart` for building decision trees - `caret` for various modeling techniques, including decision trees - `ggplot2` for data visualizations
+
+
+```{r}
+## Install required packages if not already installed
+#install.packages(c("rpart", "caret", "ggplot2"))
+
+## Load libraries
+library(rpart)
+library(caret)
+library(ggplot2)
+```
+
+
+# Step 2: Generate Fake Data
+
+First, I will create a synthetic dataset representing customers information, such as Age, Income, spending habits score, and Segment (the target variable).
+
+```{r}
+# Set seed for reproducibility
+set.seed(42)
+
+# Generate fake data
+n <- 200  # Number of observations
+data <- data.frame(
+  Age = sample(18:70, n, replace = TRUE),
+  Income = sample(20000:120000, n, replace = TRUE),
+  SpendingScore = sample(1:100, n, replace = TRUE),
+  Segment = sample(c("Low", "Medium", "High"), n, replace = TRUE)
+)
+
+# View the first few rows of the data
+head(data)
+```
+
+####### Explanation: Here, I used the sample() function to randomly generate values for Age, Income, and SpendingScore. The Segment is a categorical variable indicating whether a customer belongs to the "Low", "Medium", or "High" segment.
+
+# Step 3: Splitting the Data
+
+To evaluate the decision tree's performance, I split the dataset into training (70%) and testing (30%) sets. The model will be trained on the training set and tested on the testing set to check its accuracy.
+
+
+```{r}
+# Create a training (70%) and testing (30%) split
+set.seed(42)
+trainIndex <- createDataPartition(data$Segment, p = 0.7, list = FALSE)
+trainData <- data[trainIndex, ]
+testData <- data[-trainIndex, ]
+```
+
+####### Explanation: The createDataPartition() function from the caret package creates an index to split the data into training and testing sets. I used a 70/30 split, which is a common practice to ensure the model has enough data to learn from while still being tested on unseen data.
+
+# Step 4: Building the Decision Tree
+
+Next, I use the rpart() function to build the decision tree model. This function will automatically determine the best splits in the data based on the Segment variable.
+
+
+```{r}
+# Build the decision tree model
+treeModel <- rpart(Segment ~ Age + Income + SpendingScore, 
+                   data = trainData, 
+                   method = "class")
+
+# Print the model summary
+summary(treeModel)
+```
+
+####### Explanation: The formula Segment ~ Age + Income + SpendingScore indicates that I predicted the Segment variable based on Age, Income, and SpendingScore. The method = "class" argument specifies that this is a classification problem.
+
+# Step 5: Visualizing the Decision Tree
+
+Now, I will visualize the decision tree, which helps us understand the decision rules the model has learned.
+
+
+```{r}
+# Plot the decision tree
+plot(treeModel)
+text(treeModel, use.n = TRUE, all = TRUE, cex = 0.5)
+```
+
+
+####### Explanation: The plot() function generates a visual representation of the decision tree, while text() adds labels to the tree nodes. The use.n = TRUE argument includes the number of observations in each node, and cex = 0.8 controls the size of the text. The plot typically shows the decision tree with nodes and branches. Each node represents a decision rule (e.g., "Is Age < 40?"), and branches represent the outcomes of these decisions.
+
+# Step 6: Predicting and Evaluating the Model
+
+After training the model, I use it to make predictions on the testing set and evaluate its accuracy using a confusion matrix.
+
+
+```{r}
+# Predict on the test data
+predictions <- predict(treeModel, newdata = testData, type = "class")
+
+#Ensure the reference variable is a factor
+testData$Segment <- factor(testData$Segment)
+
+# Predict on test data
+predictions <- factor(predictions, levels = levels(testData$Segment))
+
+# Generate the confusion matrix
+confusionMatrix(predictions, testData$Segment)
+```
+
+
+
+####### Explanation: The predict() function applies the trained model to the test data to generate predictions. The confusionMatrix() function from the caret package compares the predictions to the actual segments, allowing us to evaluate the model's accuracy.
+
+# Step 7: Fine-Tuning the Model
+
+To improve the model's performance, I can use the caret package to fine-tune the decision tree by cross-validating different complexity parameters.
+
+
+```{r}
+# Define the training control
+train_control <- trainControl(method = "cv", number = 10)
+
+# Train the model with caret, applying cross-validation
+tunedModel <- train(Segment ~ Age + Income + SpendingScore, 
+                    data = trainData, 
+                    method = "rpart", 
+                    trControl = train_control)
+
+# Print the best model
+print(tunedModel$finalModel)
+```
+
+
+####### Explanation: The trainControl() function specifies that we want to use 10-fold cross-validation (method = "cv", number = 10). The train() function from the caret package then trains the model, tuning it by testing different values of the complexity parameter (cp).
+
+# Step 8: Visualization
+
+Finally, I can visualize the performance of our tuned model using ggplot2, which allows us to plot the relationship between the complexity parameter and accuracy.
+
+
+```{r}
+# Plot the complexity parameter (cp) vs accuracy
+ggplot(tunedModel) +
+  geom_line(aes(x = tunedModel$results$cp, y = tunedModel$results$Accuracy)) +
+  labs(x = "Complexity Parameter (cp)", y = "Accuracy") +
+  ggtitle("Model Accuracy vs Complexity Parameter")
+```
+
+
+####### Explanation: Here, ggplot() initializes the plot, and geom_line() creates a line graph showing how the accuracy of the model varies with the complexity parameter (cp).
+
